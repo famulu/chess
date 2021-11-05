@@ -55,14 +55,6 @@ class ChessGameWindow < Gosu::Window
           @promoted_piece = nil
           return
         end
-        puts 
-        puts "*****"
-        puts
-        puts "x: #{x}, y: #{y}"
-        puts "start_x: #{config[:start_x]}, end_x: #{config[:end_x]}"
-        puts
-        puts "*****"
-        puts
       end
     end
 
