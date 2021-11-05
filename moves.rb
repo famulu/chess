@@ -1,7 +1,7 @@
 def valid_move?(initial, final, board, en_passant)
   case initial.piece
   when King
-    return valid_king_move?(initial, final)
+    return valid_king_move?(initial, final, board)
   when Queen
     return valid_bishop_move?(initial, final, board) || valid_rook_move?(initial, final, board)
   when Bishop
@@ -18,9 +18,28 @@ def valid_move?(initial, final, board, en_passant)
   end
 end
 
-def valid_king_move?(initial, final)
+def valid_king_move?(initial, final, board)
   if (final.x - initial.x).abs <= 1 && (final.y - initial.y).abs <= 1
     return true
+  elsif (final.y == initial.y) && (final.x - initial.x).abs == 2
+    if !initial.piece.has_moved
+      if !is_checked?(initial, board, false)
+        middle_piece_x = (initial.x + final.x) / 2
+        if board[initial.y][middle_piece_x].piece == nil
+          if !is_checked?(BoardSquare.new(initial.y, middle_piece_x, King.new(initial.piece.is_white)), board, false)
+            castled_rook_x = final.x < initial.x ? 0 : 7
+            castled_rook = board[initial.y][castled_rook_x]
+            if castled_rook.piece != nil
+              if Rook === castled_rook.piece && !castled_rook.piece.has_moved
+                if final.x > initial.x || board[initial.y][1].piece == nil
+                  return true
+                end
+              end
+            end
+          end
+        end
+      end
+    end
   end
   return false
 end

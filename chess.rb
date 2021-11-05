@@ -10,7 +10,7 @@ require_relative "history"
 COLORS = [Gosu::Color.new(0xFF1EB1FA), Gosu::Color.new(0xFF1D4DB5)]
 
 module ZOrder
-  BACKGROUND, UI, OVERLAY = *0..2
+  BACKGROUND, UI, OVERLAY, OVERLAY_BACKGROUND, OVERLAY_UI = *0..4
 end
 
 class ChessGameWindow < Gosu::Window
@@ -34,67 +34,117 @@ class ChessGameWindow < Gosu::Window
     @attacker = nil
     @en_passant = nil
     @history = ChessHistory.new
+
+    @promoted_piece = nil
+    @promotion_configurations = [
+      {start_x: 30, end_x: 130, piece: Knight},
+      {start_x: 190, end_x: 290, piece: Queen},
+      {start_x: 350, end_x: 450, piece: Bishop},
+      {start_x: 510, end_x: 610, piece: Rook}
+    ]
   end
   
-  def button_down(id)
-    if id == Gosu::MsLeft
+  def promote_pawn(y, x)
 
-      if mouse_y() <= 630 && mouse_y() >= 530
-        if mouse_x() >= 650 && mouse_x() <= 730
-          if undo_turn(@history, @board)
-            @white_turn = !@white_turn
-          end
-        elsif mouse_x() >= 750 && mouse_x() <= 830
-          if redo_turn(@history, @board)
-            @white_turn = !@white_turn
-          end
+    if y.between?(270, 370)
+      @promotion_configurations.each do |config|
+        if x.between?(config[:start_x], config[:end_x])
+          new_piece = BoardSquare.new(@promoted_piece.y, @promoted_piece.x, config[:piece].new(@promoted_piece.piece.is_white))
+          @history.turns[@history.pointer].chosen_piece = new_piece
+          @board[@promoted_piece.y][@promoted_piece.x] = new_piece
+          @promoted_piece = nil
+          return
         end
-      end
-
-      @board.size.times do |y|
-        @board[y].size.times do |x|
-          if mouse_x() < (x + 1) * SQUARE_LENGTH && mouse_y() < (y + 1) * SQUARE_LENGTH
-            if @selected == nil
-              if @board[y][x].piece != nil && @white_turn == @board[y][x].piece.is_white
-                @selected = @board[y][x]
-              end
-            else
-              if (@board[y][x].piece == nil) || (@board[y][x].piece.is_white != @selected.piece.is_white)
-                if valid_move?(@selected, @board[y][x], @board, @en_passant)
-                  selected_coord = {x: @selected.x, y: @selected.y}
-                  target_piece = @board[y][x]
-
-                  add_to_history(@history, @selected, target_piece)
-                  move_square(@selected, x, y, BoardSquare.new(@selected.y, @selected.x, nil), @board)
-                  if is_checked?((@white_turn ? @white_king : @black_king), @board, false)
-                    move_square(@selected, selected_coord[:x], selected_coord[:y], target_piece, @board)
-                    pop_from_history(history)
-                  else
-                    if Pawn === @selected.piece
-                      if (selected_coord[:y] - y).abs == 2
-                        @en_passant = @selected
-                      elsif @en_passant != nil
-                        if (@selected.x == @en_passant.x) && (@selected.y == @en_passant.y + (@en_passant.piece.is_white ? 1 : -1))
-                          @board[@en_passant.y][@en_passant.x] = BoardSquare.new(@en_passant.y, @en_passant.x, nil)
-                        end
-                        @en_passant = nil
-                      end
-                    end
-                    @white_turn = !@white_turn                    
-                  end
-
-                end
-              end
-              @selected = nil
-            end
-
-            return
-          end
-
-        end
+        puts 
+        puts "*****"
+        puts
+        puts "x: #{x}, y: #{y}"
+        puts "start_x: #{config[:start_x]}, end_x: #{config[:end_x]}"
+        puts
+        puts "*****"
+        puts
       end
     end
 
+  end
+
+  def button_down(id)
+    if id == Gosu::MsLeft
+      if @promoted_piece
+        promote_pawn(mouse_y(), mouse_x())
+      else
+        if mouse_y() <= 630 && mouse_y() >= 530
+          if mouse_x() >= 650 && mouse_x() <= 730
+            if undo_turn(@history, @board)
+              @white_turn = !@white_turn
+            end
+          elsif mouse_x() >= 750 && mouse_x() <= 830
+            if redo_turn(@history, @board)
+              @white_turn = !@white_turn
+            end
+          end
+        end
+  
+        @board.size.times do |y|
+          @board[y].size.times do |x|
+            if mouse_x() < (x + 1) * SQUARE_LENGTH && mouse_y() < (y + 1) * SQUARE_LENGTH
+              if @selected == nil
+                if @board[y][x].piece != nil && @white_turn == @board[y][x].piece.is_white
+                  @selected = @board[y][x]
+                end
+              else
+                if (@board[y][x].piece == nil) || (@board[y][x].piece.is_white != @selected.piece.is_white)
+                  if valid_move?(@selected, @board[y][x], @board, @en_passant)
+                    selected_coord = {x: @selected.x, y: @selected.y}
+                    target_piece = @board[y][x]
+  
+                    add_to_history(@history, @selected, target_piece)
+                    move_square(@selected, x, y, BoardSquare.new(@selected.y, @selected.x, nil), @board)
+                    if is_checked?((@white_turn ? @white_king : @black_king), @board, false)
+                      move_square(@selected, selected_coord[:x], selected_coord[:y], target_piece, @board)
+                      pop_from_history(@history)
+                    else
+                      if Pawn === @selected.piece
+                        if (selected_coord[:y] - y).abs == 2
+                          @en_passant = @selected
+                        elsif @en_passant != nil
+                          if (@selected.x == @en_passant.x) && (@selected.y == @en_passant.y + (@en_passant.piece.is_white ? 1 : -1))
+                            @board[@en_passant.y][@en_passant.x] = BoardSquare.new(@en_passant.y, @en_passant.x, nil)
+                            @history.turns[@history.pointer].en_passant = true
+                          end
+                          @en_passant = nil
+                        end
+  
+                        if y == (@selected.piece.is_white ? 0 : 7)
+                          @promoted_piece = @selected
+                          @history.turns[@history.pointer].promotion = true
+                        end
+                      elsif King === @selected.piece
+                        if (selected_coord[:x] - x).abs == 2
+                          # King has castled
+                          castled_rook_new_x = x + (x < selected_coord[:x] ? 1 : -1)
+                          castled_rook_old_x = x < selected_coord[:x] ? 0 : 7
+                          castled_rook = @board[y][castled_rook_old_x]
+                          move_square(castled_rook, castled_rook_new_x, y, BoardSquare.new(y, castled_rook_old_x, nil), @board) 
+                          @history.turns[@history.pointer].castling = true
+                          castled_rook.piece.has_moved = true
+                        end
+                        @selected.piece.has_moved = true
+                      elsif Rook === @selected.piece
+                        @selected.piece.has_moved = true
+                      end
+                      @white_turn = !@white_turn                    
+                    end
+                  end
+                end
+                @selected = nil
+              end
+              return
+            end
+          end
+        end
+      end
+    end
   end
 
   def update
@@ -131,6 +181,20 @@ class ChessGameWindow < Gosu::Window
       Gosu.draw_rect((@selected.x + 1) * SQUARE_LENGTH - BORDER_WIDTH, @selected.y * SQUARE_LENGTH, BORDER_WIDTH, SQUARE_LENGTH, Gosu::Color::BLACK, ZOrder::OVERLAY)
       Gosu.draw_rect(@selected.x * SQUARE_LENGTH, @selected.y * SQUARE_LENGTH, SQUARE_LENGTH, BORDER_WIDTH, Gosu::Color::BLACK, ZOrder::OVERLAY)
       Gosu.draw_rect(@selected.x * SQUARE_LENGTH, (@selected.y + 1) * SQUARE_LENGTH - BORDER_WIDTH, SQUARE_LENGTH, BORDER_WIDTH, Gosu::Color::BLACK, ZOrder::OVERLAY)
+    end
+
+    if @promoted_piece
+      promotion_color = COLORS[(@white_turn ? 1 : 0)]
+      Gosu.draw_rect(0, 0, WIDTH, HEIGHT, Gosu::Color.argb(0xAF_000000), ZOrder::OVERLAY)
+
+      Gosu.draw_rect(30, 270, 100, 100, promotion_color, ZOrder::OVERLAY_BACKGROUND)
+      @font.draw_text_rel(Knight.new(!@white_turn).symbol, 80, 320, ZOrder::OVERLAY_UI, 0.5, 0.5)
+      Gosu.draw_rect(190, 270, 100, 100, promotion_color, ZOrder::OVERLAY_BACKGROUND)
+      @font.draw_text_rel(Queen.new(!@white_turn).symbol, 240, 320, ZOrder::OVERLAY_UI, 0.5, 0.5)
+      Gosu.draw_rect(350, 270, 100, 100, promotion_color, ZOrder::OVERLAY_BACKGROUND)
+      @font.draw_text_rel(Bishop.new(!@white_turn).symbol, 400, 320, ZOrder::OVERLAY_UI, 0.5, 0.5)
+      Gosu.draw_rect(510, 270, 100, 100, promotion_color, ZOrder::OVERLAY_BACKGROUND)
+      @font.draw_text_rel(Rook.new(!@white_turn).symbol, 560, 320, ZOrder::OVERLAY_UI, 0.5, 0.5)
     end
 
     if @checked
