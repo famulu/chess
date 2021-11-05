@@ -5,6 +5,7 @@ require_relative "moves"
 require_relative "check"
 require_relative "move_square"
 require_relative "checkmate"
+require_relative "history"
 
 COLORS = [Gosu::Color.new(0xFF1EB1FA), Gosu::Color.new(0xFF1D4DB5)]
 
@@ -32,10 +33,24 @@ class ChessGameWindow < Gosu::Window
     @checkmated = false
     @attacker = nil
     @en_passant = nil
+    @history = ChessHistory.new
   end
   
   def button_down(id)
     if id == Gosu::MsLeft
+
+      if mouse_y() <= 630 && mouse_y() >= 530
+        if mouse_x() >= 650 && mouse_x() <= 730
+          if undo_turn(@history, @board)
+            @white_turn = !@white_turn
+          end
+        elsif mouse_x() >= 750 && mouse_x() <= 830
+          if redo_turn(@history, @board)
+            @white_turn = !@white_turn
+          end
+        end
+      end
+
       @board.size.times do |y|
         @board[y].size.times do |x|
           if mouse_x() < (x + 1) * SQUARE_LENGTH && mouse_y() < (y + 1) * SQUARE_LENGTH
@@ -49,9 +64,11 @@ class ChessGameWindow < Gosu::Window
                   selected_coord = {x: @selected.x, y: @selected.y}
                   target_piece = @board[y][x]
 
-                  move_square(@selected, x, y, nil, @board)
+                  add_to_history(@history, @selected, target_piece)
+                  move_square(@selected, x, y, BoardSquare.new(@selected.y, @selected.x, nil), @board)
                   if is_checked?((@white_turn ? @white_king : @black_king), @board, false)
                     move_square(@selected, selected_coord[:x], selected_coord[:y], target_piece, @board)
+                    pop_from_history(history)
                   else
                     if Pawn === @selected.piece
                       if (selected_coord[:y] - y).abs == 2
@@ -77,6 +94,7 @@ class ChessGameWindow < Gosu::Window
         end
       end
     end
+
   end
 
   def update
@@ -99,6 +117,12 @@ class ChessGameWindow < Gosu::Window
         end
       end
     end
+
+    Gosu.draw_rect(650, 530, 80, 100, COLORS[0], ZOrder::UI)
+    @text_font.draw_text_rel("Undo", 690, 580, ZOrder::UI, 0.5, 0.5)
+
+    Gosu.draw_rect(750, 530, 80, 100, COLORS[0], ZOrder::UI)
+    @text_font.draw_text_rel("Redo", 790, 580, ZOrder::UI, 0.5, 0.5)
 
     if @selected != nil
       @text_font.draw_text("Column: #{@selected.x}\nRow: #{@selected.y}", 650, 300, ZOrder::UI)
