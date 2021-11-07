@@ -2,7 +2,7 @@
 
 A chess GUI written in Ruby.
 
-Supports most features of chess.
+Features include:
  - Check
  - Checkmate
  - Pawn Promotion
