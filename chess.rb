@@ -36,7 +36,7 @@ class ChessGameWindow < Gosu::Window
     @history = ChessHistory.new
 
     @promoted_piece = nil
-    @promotion_button_configurations = [
+    @promotion_buttons = [
       {start_x: 30, end_x: 130, piece: Knight},
       {start_x: 190, end_x: 290, piece: Queen},
       {start_x: 350, end_x: 450, piece: Bishop},
@@ -46,9 +46,9 @@ class ChessGameWindow < Gosu::Window
   
   def promote_pawn(y, x)
     if y.between?(270, 370)
-      @promotion_configurations.each do |config|
-        if x.between?(config[:start_x], config[:end_x])
-          new_piece = BoardSquare.new(@promoted_piece.y, @promoted_piece.x, config[:piece].new(@promoted_piece.piece.is_white))
+      @promotion_buttons.each do |button|
+        if x.between?(button[:start_x], button[:end_x])
+          new_piece = BoardSquare.new(@promoted_piece.y, @promoted_piece.x, button[:piece].new(@promoted_piece.piece.is_white))
           @history.turns[@history.pointer].chosen_piece = new_piece
           @board[@promoted_piece.y][@promoted_piece.x] = new_piece
           @promoted_piece = nil
@@ -85,6 +85,8 @@ class ChessGameWindow < Gosu::Window
         end
       end
     end
+
+    return false
   end
 
   def button_down(id)
@@ -103,8 +105,10 @@ class ChessGameWindow < Gosu::Window
         end
         
         coord = which_square(mouse_y(), mouse_x())
-        y = coord[0]
-        x = coord[1]
+        if !coord
+          return
+        end
+        y, x = coord[0], coord[1]
 
         if @selected == nil
           if @board[y][x].piece != nil && @white_turn == @board[y][x].piece.is_white
@@ -124,7 +128,7 @@ class ChessGameWindow < Gosu::Window
                 pop_from_history(@history)
               else
                 if Pawn === @selected.piece
-                  if (selected_coord[:y] - y).abs == 2
+                  if (selected_coord[:y] - y).abs == 2 # Check if pawn has moved two squares
                     @en_passant = @selected
                   elsif @en_passant != nil
                     if (@selected.x == @en_passant.x) && (@selected.y == @en_passant.y + (@en_passant.piece.is_white ? 1 : -1))
@@ -139,8 +143,7 @@ class ChessGameWindow < Gosu::Window
                     @history.turns[@history.pointer].promotion = true
                   end
                 elsif King === @selected.piece
-                  if (selected_coord[:x] - x).abs == 2
-                    # King has castled
+                  if (selected_coord[:x] - x).abs == 2 # Check if king has castled
                     castled_rook_new_x = x + (x < selected_coord[:x] ? 1 : -1)
                     castled_rook_old_x = x < selected_coord[:x] ? 0 : 7
                     castled_rook = @board[y][castled_rook_old_x]
@@ -158,8 +161,6 @@ class ChessGameWindow < Gosu::Window
           end
           @selected = nil
         end
-        return
-
       end
     end
   end
