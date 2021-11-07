@@ -36,7 +36,7 @@ class ChessGameWindow < Gosu::Window
     @history = ChessHistory.new
 
     @promoted_piece = nil
-    @promotion_configurations = [
+    @promotion_button_configurations = [
       {start_x: 30, end_x: 130, piece: Knight},
       {start_x: 190, end_x: 290, piece: Queen},
       {start_x: 350, end_x: 450, piece: Bishop},
@@ -45,7 +45,6 @@ class ChessGameWindow < Gosu::Window
   end
   
   def promote_pawn(y, x)
-
     if y.between?(270, 370)
       @promotion_configurations.each do |config|
         if x.between?(config[:start_x], config[:end_x])
@@ -57,7 +56,35 @@ class ChessGameWindow < Gosu::Window
         end
       end
     end
+  end
 
+  def undo_pressed?(y, x)
+    if y.between?(530, 630) && x.between?(650, 730)
+      return true
+    end
+    return false
+  end
+
+  def redo_pressed?(y, x)
+    if y.between?(530, 630) && x.between?(750, 830)
+      return true
+    end
+    return false
+  end
+
+  def which_square(y, x)
+    num_of_rows = @board.size
+    num_of_cols = @board[0].size
+
+    num_of_rows.times do |row|
+      if y < (row + 1) * SQUARE_LENGTH
+        num_of_cols.times do |col|
+          if x < (col + 1) * SQUARE_LENGTH
+            return [row, col]
+          end
+        end
+      end
+    end
   end
 
   def button_down(id)
@@ -65,76 +92,74 @@ class ChessGameWindow < Gosu::Window
       if @promoted_piece
         promote_pawn(mouse_y(), mouse_x())
       else
-        if mouse_y() <= 630 && mouse_y() >= 530
-          if mouse_x() >= 650 && mouse_x() <= 730
-            if undo_turn(@history, @board)
-              @white_turn = !@white_turn
-            end
-          elsif mouse_x() >= 750 && mouse_x() <= 830
-            if redo_turn(@history, @board)
-              @white_turn = !@white_turn
-            end
+        if undo_pressed?(mouse_y(), mouse_x()) 
+          if undo_turn(@history, @board)
+            @white_turn = !@white_turn
+          end
+        elsif redo_pressed?(mouse_y(), mouse_x())
+          if redo_turn(@history, @board)
+            @white_turn = !@white_turn
           end
         end
-  
-        @board.size.times do |y|
-          @board[y].size.times do |x|
-            if mouse_x() < (x + 1) * SQUARE_LENGTH && mouse_y() < (y + 1) * SQUARE_LENGTH
-              if @selected == nil
-                if @board[y][x].piece != nil && @white_turn == @board[y][x].piece.is_white
-                  @selected = @board[y][x]
-                end
+        
+        coord = which_square(mouse_y(), mouse_x())
+        y = coord[0]
+        x = coord[1]
+
+        if @selected == nil
+          if @board[y][x].piece != nil && @white_turn == @board[y][x].piece.is_white
+            @selected = @board[y][x]
+          end
+        else
+          if (@board[y][x].piece == nil) || (@board[y][x].piece.is_white != @selected.piece.is_white)
+            if valid_move?(@selected, @board[y][x], @board, @en_passant)
+              
+              selected_coord = {x: @selected.x, y: @selected.y}
+              target_piece = @board[y][x]
+
+              add_to_history(@history, @selected, target_piece)
+              move_square(@selected, x, y, BoardSquare.new(@selected.y, @selected.x, nil), @board)
+              if is_checked?((@white_turn ? @white_king : @black_king), @board, false)
+                move_square(@selected, selected_coord[:x], selected_coord[:y], target_piece, @board)
+                pop_from_history(@history)
               else
-                if (@board[y][x].piece == nil) || (@board[y][x].piece.is_white != @selected.piece.is_white)
-                  if valid_move?(@selected, @board[y][x], @board, @en_passant)
-                    selected_coord = {x: @selected.x, y: @selected.y}
-                    target_piece = @board[y][x]
-  
-                    add_to_history(@history, @selected, target_piece)
-                    move_square(@selected, x, y, BoardSquare.new(@selected.y, @selected.x, nil), @board)
-                    if is_checked?((@white_turn ? @white_king : @black_king), @board, false)
-                      move_square(@selected, selected_coord[:x], selected_coord[:y], target_piece, @board)
-                      pop_from_history(@history)
-                    else
-                      if Pawn === @selected.piece
-                        if (selected_coord[:y] - y).abs == 2
-                          @en_passant = @selected
-                        elsif @en_passant != nil
-                          if (@selected.x == @en_passant.x) && (@selected.y == @en_passant.y + (@en_passant.piece.is_white ? 1 : -1))
-                            @board[@en_passant.y][@en_passant.x] = BoardSquare.new(@en_passant.y, @en_passant.x, nil)
-                            @history.turns[@history.pointer].en_passant = true
-                          end
-                          @en_passant = nil
-                        end
-  
-                        if y == (@selected.piece.is_white ? 0 : 7)
-                          @promoted_piece = @selected
-                          @history.turns[@history.pointer].promotion = true
-                        end
-                      elsif King === @selected.piece
-                        if (selected_coord[:x] - x).abs == 2
-                          # King has castled
-                          castled_rook_new_x = x + (x < selected_coord[:x] ? 1 : -1)
-                          castled_rook_old_x = x < selected_coord[:x] ? 0 : 7
-                          castled_rook = @board[y][castled_rook_old_x]
-                          move_square(castled_rook, castled_rook_new_x, y, BoardSquare.new(y, castled_rook_old_x, nil), @board) 
-                          @history.turns[@history.pointer].castling = true
-                          castled_rook.piece.has_moved = true
-                        end
-                        @selected.piece.has_moved = true
-                      elsif Rook === @selected.piece
-                        @selected.piece.has_moved = true
-                      end
-                      @white_turn = !@white_turn                    
+                if Pawn === @selected.piece
+                  if (selected_coord[:y] - y).abs == 2
+                    @en_passant = @selected
+                  elsif @en_passant != nil
+                    if (@selected.x == @en_passant.x) && (@selected.y == @en_passant.y + (@en_passant.piece.is_white ? 1 : -1))
+                      @board[@en_passant.y][@en_passant.x] = BoardSquare.new(@en_passant.y, @en_passant.x, nil)
+                      @history.turns[@history.pointer].en_passant = true
                     end
+                    @en_passant = nil
                   end
+
+                  if y == (@selected.piece.is_white ? 0 : 7)
+                    @promoted_piece = @selected
+                    @history.turns[@history.pointer].promotion = true
+                  end
+                elsif King === @selected.piece
+                  if (selected_coord[:x] - x).abs == 2
+                    # King has castled
+                    castled_rook_new_x = x + (x < selected_coord[:x] ? 1 : -1)
+                    castled_rook_old_x = x < selected_coord[:x] ? 0 : 7
+                    castled_rook = @board[y][castled_rook_old_x]
+                    move_square(castled_rook, castled_rook_new_x, y, BoardSquare.new(y, castled_rook_old_x, nil), @board) 
+                    @history.turns[@history.pointer].castling = true
+                    castled_rook.piece.has_moved = true
+                  end
+                  @selected.piece.has_moved = true
+                elsif Rook === @selected.piece
+                  @selected.piece.has_moved = true
                 end
-                @selected = nil
+                @white_turn = !@white_turn                    
               end
-              return
             end
           end
+          @selected = nil
         end
+        return
+
       end
     end
   end

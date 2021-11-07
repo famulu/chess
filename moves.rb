@@ -1,19 +1,19 @@
 def valid_move?(initial, final, board, en_passant)
   case initial.piece
   when King
-    return valid_king_move?(initial, final, board)
+    valid_king_move?(initial, final, board)
   when Queen
-    return valid_bishop_move?(initial, final, board) || valid_rook_move?(initial, final, board)
+    valid_bishop_move?(initial, final, board) || valid_rook_move?(initial, final, board)
   when Bishop
-    return valid_bishop_move?(initial, final, board)
+    valid_bishop_move?(initial, final, board)
   when Knight
-    return valid_knight_move?(initial, final)
+    valid_knight_move?(initial, final)
   when Rook
-    return valid_rook_move?(initial, final, board)
+    valid_rook_move?(initial, final, board)
   when Pawn
-    return valid_pawn_move?(initial, final, en_passant, board)
+    valid_pawn_move?(initial, final, en_passant, board)
   else
-    puts "What the hell is happening over here!"
+    puts 'What the hell is happening over here!'
     puts initial.piece.class
   end
 end
