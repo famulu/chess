@@ -19,3 +19,4 @@ Despite being horrible at the game, I have always been fascinated by the game of
 ## Thanks
 - [Gosu](https://github.com/gosu/gosu) - A 2D game development library for Ruby and C++.
 ## License
+This project is licensed under the MIT License - see the [LICENSE](./LICENSE) file for details.
